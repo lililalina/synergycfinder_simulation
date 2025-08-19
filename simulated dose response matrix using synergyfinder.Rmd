@@ -1,0 +1,216 @@
+---
+title: "Simulation of SynergyFinder"
+author: "Lina"
+date: "2025-08-19"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(synergyfinder)
+```
+##INTRODUCTION
+
+CCancer treatment is often reliant on drug combinations. Typically, the clinical development of this drug combination is achieved through trial-and-error. Screening and exploration of synergistic, additive, and antagonistic drug combination may be conducted.
+
+SynergyFinder is a R package software to analyze pre-clinical drug combination with the advantage of conducting assay chemical compounds for promising drug pair. SynergyFinder allows quantification of drug combination synergy using scoring models, including HSA, Loewe, Bliss, and ZIP. 
+
+In this simulation, the potential therapeutic combinations of therapy for the treatment of diffuse large B-cell lymphoma (DLBCL). The combinations of the BTK inhibitor ibrutinib with canertinib was evaluated for potential synergistic activity based on the percentage viability of the TMD8 cell line.
+
+#Load screening data or screening result
+
+```{r}
+data("mathews_screening_data")
+head(mathews_screening_data)
+```
+
+###Reshape data
+
+The drug combination dataset then reshaped into a dataframe for the input, that following the format of block_id, drug1, drug2, conc1, conc2, response, and conc_unit.
+
+```{r}
+res <- ReshapeData(
+  data = mathews_screening_data,
+  data_type = "viability",
+  impute = TRUE,
+  impute_method = NULL,
+  noise = TRUE,
+  seed = 1)
+```
+
+```{r}
+str(res)
+```
+```{r}
+head(res)
+```
+The output was two tibbles consisted of drug pairs and response
+
+```{r}
+res$drug_pairs
+```
+```{r}
+res$response
+```
+
+###Calculation of synergy and sensitivity analysis
+
+1. Calculation of synergy scores
+```{r}
+res <- CalculateSynergy(
+  data = res,
+  method = c("ZIP", "HSA", "Bliss", "Loewe"),
+  Emin = NA,
+  Emax = NA,
+  correct_baseline = "non")
+```
+```{r}
+head(res$synergy_scores)
+```
+
+2. Sensitivity scoring
+
+Calculation of 3 sensitive scores :
+- relative IC50
+- relative inhibition (Ri) for single drug treatment
+- combination of sensitivity score (CSS) for drug combinations
+
+```{r}
+res <- CalculateSensitivity(
+  data = res,
+  correct_baseline = "non"
+)
+```
+
+```{r}
+sensitive_columns <- c(
+  "block_id", "drug1", "drug2",
+  "ic50_1", "ic50_2",
+  "ri_1", "ri_2",
+  "css1_ic502", "css2_ic501", "css")
+res$drug_pairs[, sensitive_columns]
+```
+#Dose-response curve and dose response matrix
+
+```{r}
+for (i in c(1, 2)){
+  PlotDoseResponseCurve(
+    data = res,
+    plot_block = 1,
+    drug_index = i,
+    plot_new = FALSE,
+    record_plot = FALSE
+  )
+}
+```
+```{r}
+for (i in c(1, 2)){
+  PlotDoseResponseCurve(
+    data = res,
+    plot_block = 2,
+    drug_index = i,
+    plot_new = FALSE,
+    record_plot = FALSE
+  )
+}
+```
+```{r}
+Plot2DrugHeatmap(
+  data = res,
+  plot_block = 1,
+  drugs = c(1, 2),
+  plot_value = "response",
+  dynamic = FALSE,
+  summary_statistic = c("mean",  "median")
+)
+```
+```{r}
+Plot2DrugHeatmap(
+  data = res,
+  plot_block = 1,
+  drugs = c(1, 2),
+  plot_value = "ZIP_synergy",
+  dynamic = FALSE,
+  summary_statistic = c( "quantile_25", "quantile_75")
+)
+
+```
+
+## Combination of ibrutinib & canertinib
+
+```{r}
+for (i in c(1, 2)){
+  PlotDoseResponseCurve(
+    data = res,
+    plot_block = 2,
+    drug_index = i,
+    plot_new = FALSE,
+    record_plot = FALSE
+  )
+}
+```
+
+```{r}
+Plot2DrugHeatmap(
+  data = res,
+  plot_block = 2,
+  drugs = c(1, 2),
+  plot_value = "response",
+  dynamic = FALSE,
+  summary_statistic = c("mean",  "median")
+)
+```
+```{r}
+Plot2DrugHeatmap(
+  data = res,
+  plot_block = 2,
+  drugs = c(1, 2),
+  plot_value = "ZIP_synergy",
+  dynamic = FALSE,
+  summary_statistic = c( "quantile_25", "quantile_75")
+)
+```
+```{r}
+PlotDoseResponse(
+  data = res,
+  block_ids = c(2),
+  drugs = c(1,2),
+  save_file = TRUE,
+  file_type = "png"
+)
+```
+
+
+# Analysis of Individual Drug Dose-Response Curves
+
+##Block 2 
+###Canertinib Dose-Response Curve 
+1) At concentration of 0 nM, the baseline inhibition was around -60% which was a normal biological variability
+2) The dose-response curve of canertinib steeply increased approximately around 800 nM to 1200 nM.The IC50% was observed at concentration over 1000 nM which indicates that canertinib requires a higher concentration to achieve significant inhibition.
+3) The maximum inhibition (Emax) is approximately 45-50%, which indicates that inhibition of nacertinib is limited. 
+
+
+###Ibrutinib Dose-Response Curve 
+1) The curve for ibrutinib shows a sigmoidal dose-response relationship, with the steepest part of the curve between 1 nM and 10 nM. 
+2) The IC50 of ibrutinib is around 3 nM which was significantly lower than that of canertinib. This indicates that ibrutinib is much more potent than canertinib, providing IC50 at lower concentration.
+3) The maximum inhibiton of ibrutinib is approximately 75%, suggesting ibrutinib as a more effectif inhibitor of TMD8 cell line compared to canertinib. 
+Efficacy: The maximum inhibition (E 
+max
+
+### Analysis of the Dose Response Matrix ibrutinib and canertinib
+
+In the first column, ibrutinib alone shows increasing inhibition with increasing concentration, from -15.04% at 0 nM to 70.97% at 50 nM. 
+Meanwhile, canertinib alone (first row) exhibits increase of inhibition reaching 53.02% at 2500 nM. 
+
+Combination Effects:
+1. Potential of high antagonism showed by the combination of ibrutinib and canertinib particularly at moderate concentrations. For an example, at 0.7812 nM ibrutinib and 156.25 nM canertinib, the inhibition is a highly negative -56.94%. This means that at those concentrations, the combination shows a pro-proliferative effect. 
+2. The antagonism is concentrated in a triangular region of the matrix, with the lowest point of inhibition being at 0.1954 nM ibrutinib and 156.25 nM canertinib, where the inhibition is -78.45%.
+3. Synergy/Additivity shows at high concentrations (50 nM ibrutinib and 2500 nM canertinib) with the inhibition reaches 80.71%. This may indicate a transition from antagonism to an additive or even weakly synergistic effect at the highest concentrations.
+
+
+
